@@ -31,6 +31,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
 import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.infinispan.client.hotrod.Flag;
 import org.infinispan.client.hotrod.RemoteCache;
@@ -100,7 +102,7 @@ public class AddressBookManager {
 
       ConfigurationBuilder builder = new ConfigurationBuilder();
       builder.addServer()
-            .host(host)
+            .host(resolveEnvVars(host))
             .port(hotrodPort)
             .marshaller(new ProtoStreamMarshaller());  // The Protobuf based marshaller is required for query capabilities
       cacheManager = new RemoteCacheManager(builder.build());
@@ -113,6 +115,25 @@ public class AddressBookManager {
       registerSchemasAndMarshallers();
    }
 
+   private String resolveEnvVars(String input)
+   {
+       if (null == input)
+       {
+           return null;
+       }
+       // match ${ENV_VAR_NAME} or $ENV_VAR_NAME
+       Pattern p = Pattern.compile("\\$\\{(\\w+)\\}|\\$(\\w+)");
+       Matcher m = p.matcher(input); // get a matcher object
+       StringBuffer sb = new StringBuffer();
+       while(m.find()){
+           String envVarName = null == m.group(1) ? m.group(2) : m.group(1);
+           String envVarValue = System.getenv(envVarName);
+           m.appendReplacement(sb, null == envVarValue ? "" : envVarValue);
+       }
+       m.appendTail(sb);
+       return sb.toString();
+   }
+   
    /**
     * Register the Protobuf schemas and marshallers with the client and then register the schemas with the server too.
     */
@@ -159,7 +180,10 @@ public class AddressBookManager {
 
    private void queryLotsOfPeople() {
       int numberToQuery = Integer.parseInt(readConsole("Enter number of people to query (int): "));
+      queryLotsOfPeople(numberToQuery);
+   }
 
+   public void queryLotsOfPeople(int numberToQuery) {
       QueryFactory qf = Search.getQueryFactory(remoteCache);
       
       FilterConditionContext fcc = null;
@@ -238,6 +262,10 @@ public class AddressBookManager {
       int numberToAdd = Integer.parseInt(readConsole("Enter number of people to add (int): "));
       int lotSize = Integer.parseInt(readConsole("Enter number of people to each lot (int): "));
 
+      addLotsOfPeopleInLots(startingId, numberToAdd, lotSize);
+   }
+
+   public void addLotsOfPeopleInLots(int startingId, int numberToAdd, int lotSize) {
       Map<Integer, Person> peopleToAddMap = new HashMap();
 
       Date start = new Date();
@@ -266,7 +294,7 @@ public class AddressBookManager {
       if(peopleToAddMap.size() > 0) {
           remoteCache.putAll(peopleToAddMap);
       }
-}
+   }
    
    private void removePerson() {
       int id = Integer.parseInt(readConsole("Enter person id to remove (int): "));
@@ -333,7 +361,7 @@ public class AddressBookManager {
       }
    }
 
-   private void clearCache() {
+   public void clearCache() {
       remoteCache.clear();
       System.out.println("Cache cleared.");
    }
@@ -376,7 +404,7 @@ public class AddressBookManager {
       }
    }
 
-   private void stop() {
+   public void stop() {
       cacheManager.stop();
    }
 
