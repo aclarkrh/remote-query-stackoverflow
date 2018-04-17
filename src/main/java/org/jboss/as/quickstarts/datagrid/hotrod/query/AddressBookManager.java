@@ -25,7 +25,10 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Properties;
 
@@ -77,8 +80,9 @@ public class AddressBookManager {
          " 9. Display all cache entries\n" +
          "10. Clear cache\n" +
          "11. Add lots of people\n" +
-         "12. Query lots of people\n" +
-         "13. Quit\n";
+         "12. Add lots of people in lots\n" +
+         "13. Query lots of people\n" +
+         "14. Quit\n";
 
    private RemoteCacheManager cacheManager;
 
@@ -167,7 +171,7 @@ public class AddressBookManager {
             } else {
                   fcc = fcc.or().having("name").eq("name" + id);
             }
-      }
+      } 
 
       Query query = fcc.toBuilder().build();
 
@@ -221,13 +225,48 @@ public class AddressBookManager {
             person.setEmail("name" + id + "@example.com");
 
             if (remoteCache.containsKey(person.getId())) {
-            System.out.println("Updating person with id " + person.getId());
+                  System.out.println("Updating person with id " + person.getId());
             }
 
             // put the Person in cache
             remoteCache.put(person.getId(), person);
       }
    }
+   
+   private void addLotsOfPeopleInLots() {
+      int startingId = Integer.parseInt(readConsole("Enter starting person id (int): "));
+      int numberToAdd = Integer.parseInt(readConsole("Enter number of people to add (int): "));
+      int lotSize = Integer.parseInt(readConsole("Enter number of people to each lot (int): "));
+
+      Map<Integer, Person> peopleToAddMap = new HashMap();
+
+      Date start = new Date();
+
+      for(int id = startingId; id < startingId + numberToAdd; id++) {
+            Person person = new Person();
+            person.setId(id);
+            person.setName("name" + id);
+            person.setEmail("name" + id + "@example.com");
+
+            peopleToAddMap.put(id, person);
+
+            if(id%lotSize == 0) {
+                // put the Person in cache
+                remoteCache.putAll(peopleToAddMap);
+
+                peopleToAddMap.clear();
+
+                Date end = new Date();
+                long duration = end.getTime() - start.getTime();
+                System.out.println("Lot took " + duration/1000 + " seconds");
+                start = new Date();
+            }
+      }
+
+      if(peopleToAddMap.size() > 0) {
+          remoteCache.putAll(peopleToAddMap);
+      }
+}
    
    private void removePerson() {
       int id = Integer.parseInt(readConsole("Enter person id to remove (int): "));
@@ -381,8 +420,10 @@ public class AddressBookManager {
             } else if ("11".equals(action)) {
                   manager.addLotsOfPeople();
             } else if ("12".equals(action)) {
-                  manager.queryLotsOfPeople();
+                  manager.addLotsOfPeopleInLots();
             } else if ("13".equals(action)) {
+                  manager.queryLotsOfPeople();
+            } else if ("14".equals(action)) {
                System.out.println("Bye!");
                break;
             } else {
